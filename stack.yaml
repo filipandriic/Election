@@ -1,0 +1,128 @@
+version: '3'
+
+services:
+  adminer:
+    image: adminer
+    ports:
+      - 8080:8080
+    networks:
+      - authentication_network
+      - admin_network
+      - user_network
+      - dameon_network
+
+  redis:
+    image: redis
+    ports:
+      - 6379:6379
+    networks:
+      - user_network
+      - dameon_network
+
+  authentication_db:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - TZ=Europe/Belgrade
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 10s
+      retries: 10
+    ports:
+      - 3306:3306
+    volumes:
+      - authenticationdbdata:/var/lib/mysql
+    networks:
+      - authentication_network
+
+  authentication_database_migration:
+    image: authentication_database_migration
+    environment:
+      - DATABASE_URL=authentication_db
+      - TZ=Europe/Belgrade
+    networks:
+      - authentication_network
+
+  authentication:
+    image: authentication
+    environment:
+      - DATABASE_URL=authentication_db
+      - TZ=Europe/Belgrade
+    ports:
+      - 5002:5002
+    networks:
+      - authentication_network
+
+  election_db:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - TZ=Europe/Belgrade
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 10s
+      retries: 10
+    ports:
+      - 3307:3306
+    volumes:
+      - electiondbdata:/var/lib/mysql
+    networks:
+      - admin_network
+      - dameon_network
+
+
+  election_database_migration:
+    image: user_database_migration
+    environment:
+      - DATABASE_URL=election_db
+      - TZ=Europe/Belgrade
+    networks:
+      - admin_network
+
+  election:
+    image: admin
+    environment:
+      - DATABASE_URL=election_db
+      - TZ=Europe/Belgrade
+    ports:
+      - 5001:5001
+    networks:
+      - admin_network
+
+  user:
+    image: user
+    environment:
+      - REDIS_URI=redis
+      - TZ=Europe/Belgrade
+    ports:
+      - 5000:5000
+    networks:
+      - user_network
+    deploy:
+      replicas: 3
+
+  dameon:
+    image: dameon
+    environment:
+      - DATABASE_URL=election_db
+      - REDIS_URI=redis
+      - TZ=Europe/Belgrade
+    networks:
+      - dameon_network
+
+networks:
+  authentication_network:
+    driver: overlay
+
+  admin_network:
+    driver: overlay
+
+  user_network:
+    driver: overlay
+
+  dameon_network:
+    driver: overlay
+
+volumes:
+  authenticationdbdata:
+  electiondbdata:
